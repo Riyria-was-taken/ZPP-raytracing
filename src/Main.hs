@@ -1,30 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 
 module Main where
 
-import           Control.Monad (forM_)
-import           Hittable      (HitRecord (..), Hittable (..))
 import           HittableList  (HittableList (..))
-import           Ray           (Ray (..), at)
 import           Sphere        (Sphere (..))
-import           System.IO     (hPutStrLn, putStrLn, stderr)
-import           Text.Printf   (printf)
-import           Utils         (Color (..), Point (..), Vec3 (..), colorSpace,
-                                infinity, printPixel, unit, zeroesVec3, (.*),
-                                (.+), (.-), (./))
-
-rayColor :: Ray -> HittableList -> Color
-rayColor r world =
-    case hit world r 0 infinity of
-        Just rec ->
-            (rec.normal .+ Vec3 {x = 1, y = 1, z = 1}) .* 0.5
-        Nothing ->
-            let unitDirection :: Vec3 = unit r.direction in
-            let a :: Double = 0.5 * (unitDirection.y + 1.0) in
-            let white :: Color = Vec3 {x = 1.0, y = 1.0, z = 1.0} in
-            let blue :: Color = Vec3 {x = 0.5, y = 0.7, z =  1.0} in
-            white .* (1.0 - a) .+ blue .* a
+import           System.IO     (putStrLn)
+import           Utils         (Point, Vec3 (..))
+import           Camera        (Camera, initCamera, render)
 
 main :: IO ()
 main = do
@@ -32,35 +14,12 @@ main = do
     --case args of
     --  [] -> getContents >>= run
     --  fs -> foldM mergeFile "" (reverse fs) >>= run
-    putStrLn "P3"
+
+    let world :: HittableList = [Sphere { center = Vec3 {x = 0, y = 0, z = -1 }, radius = 0.5 },
+                 Sphere { center = Vec3 {x = 0, y = -100.5, z = -1}, radius = 100}]
+
     let aspectRatio :: Double = 16.0 / 9.0
     let imageWidth :: Integer = 400
-    let imageHeight :: Integer = max 1 $ round $ fromInteger imageWidth / aspectRatio
-    putStrLn $ printf "%d %d" imageWidth imageHeight
-    putStrLn $ show colorSpace
+    let camera :: Camera = initCamera aspectRatio imageWidth
 
-    let focalLength :: Double = 1.0
-    let viewportHeight :: Double = 2.0
-    let viewportWidth :: Double = viewportHeight * (fromInteger imageWidth / fromInteger imageHeight)
-    let cameraCenter :: Point = zeroesVec3
-
-    let viewportU :: Vec3 = Vec3 { x = viewportWidth, y = 0, z = 0 }
-    let viewportV :: Vec3 = Vec3 { x = 0, y = -viewportHeight, z = 0 }
-
-    let pixelDeltaU :: Vec3 = viewportU ./ fromInteger imageWidth
-    let pixelDeltaV :: Vec3 = viewportV ./ fromInteger imageHeight
-
-    -- TODO żeby kolejność odejmowania działała
-    let viewportUpperLeft :: Point = ((cameraCenter .- Vec3 { x = 0, y = 0, z = focalLength }) .- viewportU ./ 2) .- viewportV ./ 2
-    let pixel00Loc :: Point = viewportUpperLeft .+ (pixelDeltaU .+ pixelDeltaV) .* 0.5
-
-    let world = [Sphere { center = Vec3 {x = 0, y = 0, z = -1 }, radius = 0.5 }, Sphere { center = Vec3 {x = 0, y = -100.5, z = -1}, radius = 100}]
-
-    forM_ [0..imageHeight-1] (\j -> do
-        hPutStrLn stderr $ printf "Remaining lines: %d" (imageHeight - j + 1)
-        forM_ [0..imageWidth-1] (\i -> do
-            let pixelCenter :: Point = pixel00Loc .+ pixelDeltaU .* fromInteger i .+ pixelDeltaV .* fromInteger j
-            let ray :: Ray = Ray { origin = cameraCenter, direction = pixelCenter .- cameraCenter }
-            let color :: Color = rayColor ray world
-            printPixel color))
-    hPutStrLn stderr "Done!"
+    putStrLn $ render camera world

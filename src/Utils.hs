@@ -3,15 +3,12 @@
 
 module Utils where
 
-import           System.IO   (putStrLn)
 import           Text.Printf (printf)
 
 data Vec3 = Vec3 { x :: Double, y :: Double, z :: Double } deriving (Eq, Show)
 
 type Point = Vec3
 type Color = Vec3
-
-colorSpace :: Integer = 256
 
 zeroesVec3 :: Vec3
 zeroesVec3 = Vec3 { x = 0, y = 0, z = 0 }
@@ -67,13 +64,6 @@ cross u v = Vec3 { x = u.y * v.z - u.z + v.y, y = u.z * v.x - u.x * v.z, z = u.x
 
 unit :: Vec3 -> Vec3
 unit v = divide v $ len v
-
-printPixel :: Color -> IO ()
-printPixel color =
-    let r :: Integer = round (color.x * fromInteger colorSpace) in
-    let g :: Integer = round (color.y * fromInteger colorSpace) in
-    let b :: Integer = round (color.z * fromInteger colorSpace) in
-    putStrLn $ printf "%d %d %d" r g b
 
 infinity :: Double
 infinity = 1.0 / 0.0

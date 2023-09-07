@@ -74,3 +74,9 @@ printPixel color =
     let g :: Integer = round (color.y * fromInteger colorSpace) in
     let b :: Integer = round (color.z * fromInteger colorSpace) in
     putStrLn $ printf "%d %d %d" r g b
+
+infinity :: Double
+infinity = 1.0 / 0.0
+
+degreesToRadians :: Double -> Double
+degreesToRadians deg = deg * pi / 180.0

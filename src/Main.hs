@@ -4,22 +4,22 @@
 module Main where
 
 import           Control.Monad (forM_)
+import           Hittable      (HitRecord (..), Hittable (..))
+import           HittableList  (HittableList (..))
 import           Ray           (Ray (..), at)
-import           Sphere        (Sphere (..), hitSphere)
+import           Sphere        (Sphere (..))
 import           System.IO     (hPutStrLn, putStrLn, stderr)
 import           Text.Printf   (printf)
 import           Utils         (Color (..), Point (..), Vec3 (..), colorSpace,
-                                printPixel, unit, zeroesVec3, (.*), (.+), (.-),
-                                (./))
+                                infinity, printPixel, unit, zeroesVec3, (.*),
+                                (.+), (.-), (./))
 
-rayColor :: Ray -> Color
-rayColor r =
-    let t = hitSphere Sphere { center = Vec3 {x = 0, y = 0, z = -1}, radius = 0.5 } r in
-    case t > 0.0 of
-        True ->
-            let n :: Vec3 = unit $ at r t .- Vec3 {x = 0, y = 0, z = -1 } in
-            (n .+ Vec3 {x = 1, y = 1, z = 1}) .* 0.5
-        False ->
+rayColor :: Ray -> HittableList -> Color
+rayColor r world =
+    case hit world r 0 infinity of
+        Just rec ->
+            (rec.normal .+ Vec3 {x = 1, y = 1, z = 1}) .* 0.5
+        Nothing ->
             let unitDirection :: Vec3 = unit r.direction in
             let a :: Double = 0.5 * (unitDirection.y + 1.0) in
             let white :: Color = Vec3 {x = 1.0, y = 1.0, z = 1.0} in
@@ -54,11 +54,13 @@ main = do
     let viewportUpperLeft :: Point = ((cameraCenter .- Vec3 { x = 0, y = 0, z = focalLength }) .- viewportU ./ 2) .- viewportV ./ 2
     let pixel00Loc :: Point = viewportUpperLeft .+ (pixelDeltaU .+ pixelDeltaV) .* 0.5
 
+    let world = [Sphere { center = Vec3 {x = 0, y = 0, z = -1 }, radius = 0.5 }, Sphere { center = Vec3 {x = 0, y = -100.5, z = -1}, radius = 100}]
+
     forM_ [0..imageHeight-1] (\j -> do
         hPutStrLn stderr $ printf "Remaining lines: %d" (imageHeight - j + 1)
         forM_ [0..imageWidth-1] (\i -> do
             let pixelCenter :: Point = pixel00Loc .+ pixelDeltaU .* fromInteger i .+ pixelDeltaV .* fromInteger j
             let ray :: Ray = Ray { origin = cameraCenter, direction = pixelCenter .- cameraCenter }
-            let color :: Color = rayColor ray
+            let color :: Color = rayColor ray world
             printPixel color))
     hPutStrLn stderr "Done!"

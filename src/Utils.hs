@@ -39,6 +39,20 @@ multiply v t = Vec3 { x = v.x * t, y = v.y * t, z = v.z * t }
 divide :: Vec3 -> Double -> Vec3
 divide v t = Vec3 { x = v.x / t, y = v.y / t, z = v.z / t }
 
+infixr 6 .+, .-
+(.+) :: Vec3 -> Vec3 -> Vec3
+u .+ v = plus u v
+
+(.-) :: Vec3 -> Vec3 -> Vec3
+u .- v = minus u v
+
+infixr 7 .*, ./
+(.*) :: Vec3 -> Double -> Vec3
+v .* t = multiply v t
+
+(./) :: Vec3 -> Double -> Vec3
+v ./ t = divide v t
+
 len :: Vec3 -> Double
 len v = sqrt $ lenSquared v
 

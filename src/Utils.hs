@@ -16,14 +16,14 @@ colorSpace :: Integer = 256
 zeroesVec3 :: Vec3
 zeroesVec3 = Vec3 { x = 0, y = 0, z = 0 }
 
-neg :: Vec3 -> Vec3
-neg v = Vec3 { x = -v.x, y = -v.y, z = -v.z }
-
 idx :: Vec3 -> Integer -> Double
 idx v i = case i of
             0 -> v.x
             1 -> v.y
             2 -> v.z
+
+neg :: Vec3 -> Vec3
+neg v = Vec3 { x = -v.x, y = -v.y, z = -v.z }
 
 plus :: Vec3 -> Vec3 -> Vec3
 plus u v =
@@ -57,7 +57,7 @@ len :: Vec3 -> Double
 len v = sqrt $ lenSquared v
 
 lenSquared :: Vec3 -> Double
-lenSquared v = v.x * v.x + v.y * v.y + v.z * v.z
+lenSquared v = dot v v
 
 dot :: Vec3 -> Vec3 -> Double
 dot u v = u.x * v.x + u.y * v.y + u.z * v.z

@@ -2,7 +2,7 @@
 
 module Hittable where
 
-import           Interval (Interval (..))
+import           Utils (Interval (..))
 import           Ray      (Ray (..))
 import           Utils    (Point, Vec3, dot, neg)
 

@@ -4,10 +4,9 @@
 module Sphere where
 
 import           Hittable (HitRecord (..), Hittable (..), setFaceNormal)
-import           Interval (Interval (..), surrounds)
 import           Ray      (Ray (..), at)
 import           Utils    (Point (..), Vec3 (..), dot, len, lenSquared, (.-),
-                           (./))
+                           (./), Interval (..), surrounds)
 
 data Sphere = Sphere { center :: Point, radius :: Double } deriving (Eq, Show)
 

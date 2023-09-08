@@ -7,6 +7,7 @@ import           Sphere        (Sphere (..))
 import           System.IO     (putStrLn)
 import           Utils         (Point, Vec3 (..))
 import           Camera        (Camera, initCamera, render)
+import System.Random
 
 main :: IO ()
 main = do
@@ -14,12 +15,14 @@ main = do
     --case args of
     --  [] -> getContents >>= run
     --  fs -> foldM mergeFile "" (reverse fs) >>= run
-
+    
     let world :: HittableList = [Sphere { center = Vec3 {x = 0, y = 0, z = -1 }, radius = 0.5 },
                  Sphere { center = Vec3 {x = 0, y = -100.5, z = -1}, radius = 100}]
 
     let aspectRatio :: Double = 16.0 / 9.0
     let imageWidth :: Integer = 400
-    let camera :: Camera = initCamera aspectRatio imageWidth
+    let samplesPerPixel :: Integer = 100
+    let camera :: Camera = initCamera aspectRatio imageWidth samplesPerPixel
 
-    putStrLn $ render camera world
+    ppm <- render camera world
+    putStrLn ppm

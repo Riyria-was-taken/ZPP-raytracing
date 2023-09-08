@@ -3,7 +3,7 @@
 module HittableList where
 
 import           Hittable (HitRecord (..), Hittable (..))
-import           Interval (Interval (..))
+import           Utils (Interval (..))
 import           Ray      (Ray)
 import           Sphere   (Sphere)
 

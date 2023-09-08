@@ -5,6 +5,8 @@ module Utils where
 
 import           Text.Printf (printf)
 import System.Random
+import System.Random.Mersenne.Pure64 (PureMT, randomInt64)
+import Data.Int (Int64)
 
 --------------------------------------------------------------------------------
 
@@ -88,48 +90,48 @@ clamp (min, max) x =
 
 --------------------------------------------------------------------------------
 
-randomDouble :: StdGen -> (StdGen, Double)
-randomDouble gen =
-    let (gen1, d) = randomR (0, 0.999) gen in
-    (d, gen1)
+randomDouble :: PureMT -> (Double, PureMT)
+randomDouble rng =
+    let (d, rng1) = randomInt64 rng in
+    (fromIntegral d / (fromIntegral (maxBound :: Int64) + 1.0), rng1)
 
-randomDoubleIn :: StdGen -> Interval -> (StdGen, Double)
-randomDoubleIn gen (min, max) =
-    let (newGen, random) = randomDouble gen in
-    (newGen, min + (max - min) * random)
+randomDoubleIn :: PureMT -> Interval -> (Double, PureMT)
+randomDoubleIn rng (min, max) =
+    let (d, rng1) = randomDouble rng in
+    (min + (max - min) * d, rng1)
     
-randomVec3 :: StdGen -> (StdGen, Vec3)
-randomVec3 gen =
-    let (gen1, randomX) = randomDouble gen in
-    let (gen2, randomY) = randomDouble gen1 in
-    let (gen3, randomZ) = randomDouble gen2 in
-    (gen3, Vec3 { x = randomX, y = randomY, z = randomZ })
+randomVec3 :: PureMT -> (Vec3, PureMT)
+randomVec3 rng =
+    let (x, rng1) = randomDouble rng in
+    let (y, rng2) = randomDouble rng1 in
+    let (z, rng3) = randomDouble rng2 in
+    (Vec3 { x = x, y = y, z = z }, rng3)
 
-randomVec3In :: StdGen -> Interval -> (StdGen, Vec3)
-randomVec3In gen interval =
-    let (gen1, randomX) = randomDoubleIn gen interval in
-    let (gen2, randomY) = randomDoubleIn gen1 interval in
-    let (gen3, randomZ) = randomDoubleIn gen2 interval in
-    (gen3, Vec3 { x = randomX, y = randomY, z = randomZ })
+randomVec3In :: PureMT -> Interval -> (Vec3, PureMT)
+randomVec3In rng interval =
+    let (x, rng1) = randomDoubleIn rng interval in
+    let (y, rng2) = randomDoubleIn rng1 interval in
+    let (z, rng3) = randomDoubleIn rng2 interval in
+    (Vec3 { x = x, y = y, z = z }, rng3)
 
-randomInUnitSphere :: StdGen -> (StdGen, Vec3)
-randomInUnitSphere gen =
-    let (gen1, v) = randomVec3In gen (-1, 1) in
+randomInUnitSphere :: PureMT -> (Vec3, PureMT)
+randomInUnitSphere rng =
+    let (v, rng1) = randomVec3In rng (-1, 1) in
     case lenSquared v < 1 of
-        True -> (gen1, v)
-        False -> randomInUnitSphere gen1
+        True -> (v, rng1)
+        False -> randomInUnitSphere rng1
 
-randomUnitVector :: StdGen -> (StdGen, Vec3)
-randomUnitVector gen = 
-    let (gen1, v) = randomInUnitSphere gen in
-    (gen1, unit v)
+randomUnitVector :: PureMT -> (Vec3, PureMT)
+randomUnitVector rng = 
+    let (v, rng1) = randomInUnitSphere rng in
+    (unit v, rng1)
 
-randomOnHemisphere :: StdGen -> Vec3 -> (StdGen, Vec3)
-randomOnHemisphere gen normal =
-    let (gen1, v) = randomUnitVector gen in
+randomOnHemisphere :: PureMT -> Vec3 -> (Vec3, PureMT)
+randomOnHemisphere rng normal =
+    let (v, rng1) = randomUnitVector rng in
     case dot v normal > 0.0 of
-        True -> (gen1, v)
-        False -> (gen1, neg v)
+        True -> (v, rng1)
+        False -> (neg v, rng1)
 
 --------------------------------------------------------------------------------
 

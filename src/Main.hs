@@ -21,8 +21,9 @@ main = do
 
     let aspectRatio :: Double = 16.0 / 9.0
     let imageWidth :: Integer = 400
-    let samplesPerPixel :: Integer = 100
-    let camera :: Camera = initCamera aspectRatio imageWidth samplesPerPixel
+    let samplesPerPixel :: Integer = 10
+    let maxDepth :: Integer = 50
+    let camera :: Camera = initCamera aspectRatio imageWidth samplesPerPixel maxDepth
 
     let ppm = render camera world
     putStrLn ppm

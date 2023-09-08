@@ -9,19 +9,17 @@ import           Hittable      (HitRecord (..), Hittable (..))
 import           HittableList  (HittableList (..))
 import           Ray           (Ray (..))
 import           Text.Printf   (printf)
-import System.Random (StdGen, newStdGen, getStdGen)
-import           Utils         (Color (..), Point (..), Vec3 (..), infinity, randomDouble,
-                                unit, zeroesVec3, (.*), (.+), (.-), (./), Interval (..), clamp, splitEvery)
+import           Utils         
 import Control.Parallel.Strategies (rpar, runEval, Eval)
-import System.Random.MWC
+import System.Random.Mersenne.Pure64 (PureMT, pureMT)
 
 data Camera = Camera {aspectRatio :: Double,
-                      imageWidth, imageHeight, samplesPerPixel, colorSpace :: Integer,
+                      imageWidth, imageHeight, samplesPerPixel, colorSpace, maxDepth :: Integer,
                       center, pixel00Loc :: Point,
                       pixelDeltaU, pixelDeltaV :: Vec3 }
 
-initCamera :: Double -> Integer -> Integer -> Camera
-initCamera aspectRatio imageWidth samplesPerPixel =
+initCamera :: Double -> Integer -> Integer -> Integer -> Camera
+initCamera aspectRatio imageWidth samplesPerPixel maxDepth =
     let imageHeight :: Integer = max 1 $ round $ fromInteger imageWidth / aspectRatio in
     let cameraCenter :: Point = zeroesVec3 in
 
@@ -40,66 +38,75 @@ initCamera aspectRatio imageWidth samplesPerPixel =
     let pixel00Loc :: Point = viewportUpperLeft .+ (pixelDeltaU .+ pixelDeltaV) .* 0.5 in
 
     Camera { aspectRatio = aspectRatio,
-             imageWidth = imageWidth, imageHeight = imageHeight, samplesPerPixel = samplesPerPixel, colorSpace = 256,
+             imageWidth = imageWidth, imageHeight = imageHeight, samplesPerPixel = samplesPerPixel, colorSpace = 256, maxDepth = maxDepth,
              center = cameraCenter, pixel00Loc = pixel00Loc,
              pixelDeltaU = pixelDeltaU, pixelDeltaV = pixelDeltaV }
 
 render :: Camera -> HittableList -> String
 render cam world =
-    let parts = splitEvery 50 [0..cam.imageHeight-1] in
+    let parts = splitEvery 20 [0..cam.imageHeight-1] in
     let rows = concat $ runEval $ parMap (\part -> map (processRow cam world) part) parts in
-    --rows <- sequence $ runEval $ parMap (processRow cam world) [0..cam.imageHeight-1]
+    --let rows = runEval $ parMap (processRow cam world) [0..cam.imageHeight-1] in
     --putStrLn $ printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace
     let out = foldr (\row str -> row ++ str) "" rows in
     printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace ++ out
 
 processRow :: Camera -> HittableList -> Integer -> String
-processRow cam world j = do
-    --newGen <- getStdGen --initialize (singleton j)
-    foldr (\i str ->  processPixel i j cam world ++ str) "" [0..cam.imageWidth-1]
+processRow cam world j =
+    let newRng = pureMT $ fromInteger j in
+    let (out, _) = foldr (\i (str, rng) -> let (pixelStr, rng1) = processPixel rng i j cam world in (pixelStr ++ str, rng1))
+                         ("", newRng) [0..cam.imageWidth-1] in
+    out
 
-processPixel :: Integer -> Integer -> Camera -> HittableList -> String
-processPixel i j cam world =
-    let color = foldr (\n c -> let r = getRay cam i j in --gen1 in
-                                        c .+ rayColor r world) zeroesVec3 [1..cam.samplesPerPixel] in
-    getColorStr color cam.colorSpace cam.samplesPerPixel
+processPixel :: PureMT -> Integer -> Integer -> Camera -> HittableList -> (String, PureMT)
+processPixel rng i j cam world =
+    let (color, rng4) = foldr (\n (curr, rng1) ->
+                                    let (r, rng2) = getRay rng1 cam i j in
+                                    let (col, rng3) = rayColor rng2 r world cam.maxDepth in
+                                    (curr .+ col, rng3)) (zeroesVec3, rng) [1..cam.samplesPerPixel] in
+    (getColorStr color cam.colorSpace cam.samplesPerPixel, rng4)
 
-getRay :: Camera -> Integer -> Integer -> Ray -- StdGen -> (StdGen, Ray)
-getRay cam i j = --gen =
+getRay :: PureMT -> Camera -> Integer -> Integer -> (Ray, PureMT)
+getRay rng cam i j =
     let pixelCenter :: Point = cam.pixel00Loc .+ cam.pixelDeltaU .* fromInteger i .+ cam.pixelDeltaV .* fromInteger j in
-    --let (gen1, pixelSampleDiff) = pixelSampleSquare gen cam in
-    --let pixelSample :: Point = pixelCenter .+ pixelSampleDiff in
-    --(gen1, Ray { origin = cam.center, direction = pixelSample .- cam.center })
-    Ray { origin = cam.center, direction = pixelCenter.- cam.center }
+    let (pixelSampleDiff, rng1) = pixelSampleSquare rng cam in
+    let pixelSample :: Point = pixelCenter .+ pixelSampleDiff in
+    (Ray { origin = cam.center, direction = pixelSample .- cam.center }, rng1)
 
-rayColor :: Ray -> HittableList -> Color
-rayColor r world =
-    case hit world r (0, infinity) of
-        Just rec ->
-            (rec.normal .+ Vec3 {x = 1, y = 1, z = 1}) .* 0.5
-        Nothing ->
-            let unitDirection :: Vec3 = unit r.direction in
-            let a :: Double = 0.5 * (unitDirection.y + 1.0) in
-            let white :: Color = Vec3 {x = 1.0, y = 1.0, z = 1.0} in
-            let blue :: Color = Vec3 {x = 0.5, y = 0.7, z =  1.0} in
-            white .* (1.0 - a) .+ blue .* a
+rayColor :: PureMT -> Ray -> HittableList -> Integer -> (Color, PureMT)
+rayColor rng r world remainingDepth =
+    case remainingDepth <= 0 of
+        True -> (zeroesVec3, rng)
+        False -> case hit world r (0.001, infinity) of
+                    Just rec ->
+                        let (randomUnitVec3, rng1) = randomUnitVector rng in
+                        let direction = rec.normal .+ randomUnitVec3 in
+                        let (color, rng2) = rayColor rng1 Ray { origin = rec.p, direction = direction } world (remainingDepth - 1) in
+                        (color .* 0.5, rng2) -- TODO tail recursion          
+                        --(rec.normal .+ Vec3 {x = 1, y = 1, z = 1}) .* 0.5
+                    Nothing ->
+                        let unitDirection :: Vec3 = unit r.direction in
+                        let a :: Double = 0.5 * (unitDirection.y + 1.0) in
+                        let white :: Color = Vec3 {x = 1.0, y = 1.0, z = 1.0} in
+                        let blue :: Color = Vec3 {x = 0.5, y = 0.7, z =  1.0} in
+                        (white .* (1.0 - a) .+ blue .* a, rng)
 
 getColorStr :: Color -> Integer -> Integer -> String
 getColorStr color colorSpace samples =
     let scale :: Double = 1.0 / fromInteger samples in
     let intensity :: Interval = (0.000, 0.999) in
-    let r :: Integer = round (clamp intensity (color.x * scale) * fromInteger colorSpace) in
-    let g :: Integer = round (clamp intensity (color.y * scale) * fromInteger colorSpace) in
-    let b :: Integer = round (clamp intensity (color.z * scale) * fromInteger colorSpace) in
+    let r :: Integer = round (clamp intensity (linearToGamma $ color.x * scale) * fromInteger colorSpace) in
+    let g :: Integer = round (clamp intensity (linearToGamma $ color.y * scale) * fromInteger colorSpace) in
+    let b :: Integer = round (clamp intensity (linearToGamma $ color.z * scale) * fromInteger colorSpace) in
     printf "%d %d %d\n" r g b
 
-pixelSampleSquare :: StdGen -> Camera -> (StdGen, Vec3)
-pixelSampleSquare gen cam =
-    let (gen1, rnd1) = randomDouble gen in
-    let (gen2, rnd2) = randomDouble gen1 in
-    let px = -0.5 * rnd1 in
-    let py = -0.5 * rnd2 in
-    (gen2, cam.pixelDeltaU .* px .+ cam.pixelDeltaV .* py)
+pixelSampleSquare :: PureMT -> Camera -> (Vec3, PureMT)
+pixelSampleSquare rng cam =
+    let (x, rng1) = randomDouble rng in
+    let (y, rng2) = randomDouble rng1 in
+    let px = -0.5 * x in
+    let py = -0.5 * y in
+    (cam.pixelDeltaU .* px .+ cam.pixelDeltaV .* py, rng2)
 
 parMap :: (a -> b) -> [a] -> Eval [b]
 parMap f [] = return []

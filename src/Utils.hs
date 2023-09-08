@@ -4,7 +4,6 @@
 module Utils where
 
 import           Data.Int                      (Int64)
-import           System.Random
 import           System.Random.Mersenne.Pure64 (PureMT, randomInt64)
 import           Text.Printf                   (printf)
 

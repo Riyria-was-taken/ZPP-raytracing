@@ -44,12 +44,18 @@ initCamera aspectRatio imageWidth samplesPerPixel maxDepth =
              center = cameraCenter, pixel00Loc = pixel00Loc,
              pixelDeltaU = pixelDeltaU, pixelDeltaV = pixelDeltaV }
 
+funn part = do
+    th <- myThreadId
+    return $ show th ++ " "++ show part
+
 render :: Camera -> HittableList -> String
 render cam world =
     let parts = splitEvery 20 [0..cam.imageHeight-1] in
     let rows = concat $ parMap rpar (\part -> map (processRow cam world) part) parts in
+    --let rows = concat $ runEval $ parMap2 (\part -> map (processRow cam world) part) parts in
+    --let rows = concat $ parMap rpar (\part -> map (trace (unsafePerformIO $ funn part) $ processRow cam world) part) parts in
+    --let rows = concat $ runEval $ parMap2 (\part -> map (trace (unsafePerformIO $ funn part) $ processRow cam world) part) parts in
     --let rows = runEval $ parMap (processRow cam world) [0..cam.imageHeight-1] in
-    --putStrLn $ printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace
     let out = concat rows in
     printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace ++ out
 
@@ -110,9 +116,9 @@ pixelSampleSquare rng cam =
     let py = -0.5 * y in
     (cam.pixelDeltaU .* px .+ cam.pixelDeltaV .* py, rng2)
 
---parMap :: (a -> b) -> [a] -> Eval [b]
---parMap f [] = return []
---parMap f (a:as) = do
---   b <- rpar (f a)
---   bs <- parMap f as
---   return (b:bs)
+parMap2 :: (a -> b) -> [a] -> Eval [b]
+parMap2 f [] = return []
+parMap2 f (a:as) = do
+   b <- rpar (f a)
+   bs <- parMap2 f as
+   return (b:bs)

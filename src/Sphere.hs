@@ -5,10 +5,10 @@ module Sphere where
 
 import           Hittable (HitRecord (..), Hittable (..), setFaceNormal)
 import           Ray      (Ray (..), at)
-import           Utils    (Point (..), Vec3 (..), dot, len, lenSquared, (.-),
-                           (./), Interval (..), surrounds)
+import           Utils    (Interval (..), Material, Point (..), Vec3 (..), dot,
+                           len, lenSquared, surrounds, (.-), (./))
 
-data Sphere = Sphere { center :: Point, radius :: Double } deriving (Eq, Show)
+data Sphere = Sphere { center :: Point, radius :: Double, material :: Material } deriving (Eq, Show)
 
 instance Hittable Sphere where
     hit s r interval =
@@ -33,6 +33,6 @@ instance Hittable Sphere where
 buildHitRecord :: Sphere -> Ray -> Double -> HitRecord
 buildHitRecord s r t =
     let p = at r t in
-    let rec = HitRecord { p = p, normal = (p .- s.center) ./ s.radius, t = t, frontFace = True } in
+    let rec = HitRecord { p = p, normal = (p .- s.center) ./ s.radius, t = t, frontFace = True, material = s.material } in
     setFaceNormal rec r
 

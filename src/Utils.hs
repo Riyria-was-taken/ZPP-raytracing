@@ -3,10 +3,10 @@
 
 module Utils where
 
-import           Text.Printf (printf)
-import System.Random
-import System.Random.Mersenne.Pure64 (PureMT, randomInt64)
-import Data.Int (Int64)
+import           Data.Int                      (Int64)
+import           System.Random
+import           System.Random.Mersenne.Pure64 (PureMT, randomInt64)
+import           Text.Printf                   (printf)
 
 --------------------------------------------------------------------------------
 
@@ -35,6 +35,10 @@ minus :: Vec3 -> Vec3 -> Vec3
 minus u v =
     Vec3 { x = u.x - v.x, y = u.y - v.y, z = u.z - v.z }
 
+times :: Vec3 -> Vec3 -> Vec3
+times u v =
+    Vec3 { x = u.x * v.x, y = u.y * v.y, z = u.z * v.z }
+
 multiply :: Vec3 -> Double -> Vec3
 multiply v t = Vec3 { x = v.x * t, y = v.y * t, z = v.z * t }
 
@@ -47,6 +51,10 @@ u .+ v = plus u v
 
 (.-) :: Vec3 -> Vec3 -> Vec3
 u .- v = minus u v
+
+infixr 7 .**
+(.**) :: Vec3 -> Vec3 -> Vec3
+u .** v = times u v
 
 infixr 7 .*, ./
 (.*) :: Vec3 -> Double -> Vec3
@@ -90,6 +98,10 @@ clamp (min, max) x =
 
 --------------------------------------------------------------------------------
 
+data Material = Lambertian { albedo :: Color } | Metal { albedo :: Color, fuzz :: Double } deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+
 randomDouble :: PureMT -> (Double, PureMT)
 randomDouble rng =
     let (d, rng1) = randomInt64 rng in
@@ -99,7 +111,7 @@ randomDoubleIn :: PureMT -> Interval -> (Double, PureMT)
 randomDoubleIn rng (min, max) =
     let (d, rng1) = randomDouble rng in
     (min + (max - min) * d, rng1)
-    
+
 randomVec3 :: PureMT -> (Vec3, PureMT)
 randomVec3 rng =
     let (x, rng1) = randomDouble rng in
@@ -118,11 +130,11 @@ randomInUnitSphere :: PureMT -> (Vec3, PureMT)
 randomInUnitSphere rng =
     let (v, rng1) = randomVec3In rng (-1, 1) in
     case lenSquared v < 1 of
-        True -> (v, rng1)
+        True  -> (v, rng1)
         False -> randomInUnitSphere rng1
 
 randomUnitVector :: PureMT -> (Vec3, PureMT)
-randomUnitVector rng = 
+randomUnitVector rng =
     let (v, rng1) = randomInUnitSphere rng in
     (unit v, rng1)
 
@@ -130,7 +142,7 @@ randomOnHemisphere :: PureMT -> Vec3 -> (Vec3, PureMT)
 randomOnHemisphere rng normal =
     let (v, rng1) = randomUnitVector rng in
     case dot v normal > 0.0 of
-        True -> (v, rng1)
+        True  -> (v, rng1)
         False -> (neg v, rng1)
 
 --------------------------------------------------------------------------------
@@ -140,9 +152,17 @@ infinity = 1.0 / 0.0
 
 degreesToRadians :: Double -> Double
 degreesToRadians deg = deg * pi / 180.0
-    
+
 linearToGamma :: Double -> Double
 linearToGamma lin = sqrt lin
 
 splitEvery :: Int -> [a] -> [[a]]
 splitEvery n = takeWhile (not . null) . map (take n) . iterate (drop n)
+
+nearZero :: Vec3 -> Bool
+nearZero v =
+    let eps = 0.00000001 in
+    abs v.x < eps && abs v.y < eps && abs v.z < eps
+
+reflect :: Vec3 -> Vec3 -> Vec3
+reflect v n = v .- n .* (2.0 * dot v n)

@@ -3,9 +3,9 @@
 module HittableList where
 
 import           Hittable (HitRecord (..), Hittable (..))
-import           Utils (Interval (..))
 import           Ray      (Ray)
 import           Sphere   (Sphere)
+import           Utils    (Interval (..))
 
 type HittableList = [Sphere]
 

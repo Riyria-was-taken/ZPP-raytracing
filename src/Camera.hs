@@ -3,15 +3,18 @@
 
 module Camera where
 
-import           Control.Monad (forM_, mapM_)
-import           System.IO     (putStrLn)
-import           Hittable      (HitRecord (..), Hittable (..))
-import           HittableList  (HittableList (..))
-import           Ray           (Ray (..))
-import           Text.Printf   (printf)
-import           Utils         
-import Control.Parallel.Strategies (rpar, runEval, Eval)
-import System.Random.Mersenne.Pure64 (PureMT, pureMT)
+import           Control.Concurrent
+import           Control.Parallel.Strategies   (Eval, parMap, rpar, runEval)
+import           Debug.Trace                   (trace)
+import           Hittable                      (HitRecord (..), Hittable (..))
+import           HittableList                  (HittableList (..))
+import           Material                      (scatter)
+import           Ray                           (Ray (..))
+import           System.IO                     (putStrLn)
+import           System.IO.Unsafe              (unsafePerformIO)
+import           System.Random.Mersenne.Pure64 (PureMT, pureMT)
+import           Text.Printf                   (printf)
+import           Utils
 
 data Camera = Camera {aspectRatio :: Double,
                       imageWidth, imageHeight, samplesPerPixel, colorSpace, maxDepth :: Integer,
@@ -33,7 +36,6 @@ initCamera aspectRatio imageWidth samplesPerPixel maxDepth =
     let pixelDeltaU :: Vec3 = viewportU ./ fromInteger imageWidth in
     let pixelDeltaV :: Vec3 = viewportV ./ fromInteger imageHeight in
 
-    -- TODO żeby kolejność odejmowania działała
     let viewportUpperLeft :: Point = ((cameraCenter .- Vec3 { x = 0, y = 0, z = focalLength }) .- viewportU ./ 2) .- viewportV ./ 2 in
     let pixel00Loc :: Point = viewportUpperLeft .+ (pixelDeltaU .+ pixelDeltaV) .* 0.5 in
 
@@ -45,10 +47,10 @@ initCamera aspectRatio imageWidth samplesPerPixel maxDepth =
 render :: Camera -> HittableList -> String
 render cam world =
     let parts = splitEvery 20 [0..cam.imageHeight-1] in
-    let rows = concat $ runEval $ parMap (\part -> map (processRow cam world) part) parts in
+    let rows = concat $ parMap rpar (\part -> map (processRow cam world) part) parts in
     --let rows = runEval $ parMap (processRow cam world) [0..cam.imageHeight-1] in
     --putStrLn $ printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace
-    let out = foldr (\row str -> row ++ str) "" rows in
+    let out = concat rows in
     printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace ++ out
 
 processRow :: Camera -> HittableList -> Integer -> String
@@ -79,11 +81,11 @@ rayColor rng r world remainingDepth =
         True -> (zeroesVec3, rng)
         False -> case hit world r (0.001, infinity) of
                     Just rec ->
-                        let (randomUnitVec3, rng1) = randomUnitVector rng in
-                        let direction = rec.normal .+ randomUnitVec3 in
-                        let (color, rng2) = rayColor rng1 Ray { origin = rec.p, direction = direction } world (remainingDepth - 1) in
-                        (color .* 0.5, rng2) -- TODO tail recursion          
-                        --(rec.normal .+ Vec3 {x = 1, y = 1, z = 1}) .* 0.5
+                        case scatter rng r rec of
+                            Just (scattered, attenuation, rng1) ->
+                                let (color, rng2) = rayColor rng1 scattered world (remainingDepth - 1) in
+                                (attenuation .** color, rng2)
+                            Nothing -> (zeroesVec3, rng)
                     Nothing ->
                         let unitDirection :: Vec3 = unit r.direction in
                         let a :: Double = 0.5 * (unitDirection.y + 1.0) in
@@ -108,9 +110,9 @@ pixelSampleSquare rng cam =
     let py = -0.5 * y in
     (cam.pixelDeltaU .* px .+ cam.pixelDeltaV .* py, rng2)
 
-parMap :: (a -> b) -> [a] -> Eval [b]
-parMap f [] = return []
-parMap f (a:as) = do
-   b <- rpar (f a)
-   bs <- parMap f as
-   return (b:bs)
+--parMap :: (a -> b) -> [a] -> Eval [b]
+--parMap f [] = return []
+--parMap f (a:as) = do
+--   b <- rpar (f a)
+--   bs <- parMap f as
+--   return (b:bs)

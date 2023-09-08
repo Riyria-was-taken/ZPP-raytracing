@@ -2,11 +2,10 @@
 
 module Hittable where
 
-import           Utils (Interval (..))
-import           Ray      (Ray (..))
-import           Utils    (Point, Vec3, dot, neg)
+import           Ray   (Ray (..))
+import           Utils (Interval (..), Material, Point, Vec3, dot, neg)
 
-data HitRecord = HitRecord { p :: Point, normal :: Vec3, t :: Double, frontFace :: Bool } deriving (Eq, Show)
+data HitRecord = HitRecord { p :: Point, normal :: Vec3, t :: Double, material :: Material, frontFace :: Bool } deriving (Eq, Show)
 
 setFaceNormal :: HitRecord -> Ray -> HitRecord
 setFaceNormal rec r =

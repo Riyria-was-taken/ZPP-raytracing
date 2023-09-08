@@ -24,5 +24,5 @@ main = do
     let samplesPerPixel :: Integer = 100
     let camera :: Camera = initCamera aspectRatio imageWidth samplesPerPixel
 
-    ppm <- render camera world
+    let ppm = render camera world
     putStrLn ppm

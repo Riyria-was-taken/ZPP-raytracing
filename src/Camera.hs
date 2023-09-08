@@ -9,10 +9,11 @@ import           Hittable      (HitRecord (..), Hittable (..))
 import           HittableList  (HittableList (..))
 import           Ray           (Ray (..))
 import           Text.Printf   (printf)
-import           Utils         (Color (..), Point (..), Vec3 (..), infinity, randomDouble,
-                                unit, zeroesVec3, (.*), (.+), (.-), (./), Interval (..), clamp)
 import System.Random (StdGen, newStdGen, getStdGen)
+import           Utils         (Color (..), Point (..), Vec3 (..), infinity, randomDouble,
+                                unit, zeroesVec3, (.*), (.+), (.-), (./), Interval (..), clamp, splitEvery)
 import Control.Parallel.Strategies (rpar, runEval, Eval)
+import System.Random.MWC
 
 data Camera = Camera {aspectRatio :: Double,
                       imageWidth, imageHeight, samplesPerPixel, colorSpace :: Integer,
@@ -43,24 +44,25 @@ initCamera aspectRatio imageWidth samplesPerPixel =
              center = cameraCenter, pixel00Loc = pixel00Loc,
              pixelDeltaU = pixelDeltaU, pixelDeltaV = pixelDeltaV }
 
-render :: Camera -> HittableList -> IO String
-render cam world = do
-    rows <- sequence $ runEval $ parMap (processRow cam world) [0..cam.imageHeight-1]
-    putStrLn $ printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace
-    let out = foldr (\row str -> row ++ str) "" rows
-    return $ printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace ++ out
+render :: Camera -> HittableList -> String
+render cam world =
+    let parts = splitEvery 50 [0..cam.imageHeight-1] in
+    let rows = concat $ runEval $ parMap (\part -> map (processRow cam world) part) parts in
+    --rows <- sequence $ runEval $ parMap (processRow cam world) [0..cam.imageHeight-1]
+    --putStrLn $ printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace
+    let out = foldr (\row str -> row ++ str) "" rows in
+    printf "P3\n%d %d\n%d\n" cam.imageWidth cam.imageHeight cam.colorSpace ++ out
 
-processRow :: Camera -> HittableList -> Integer -> IO String
+processRow :: Camera -> HittableList -> Integer -> String
 processRow cam world j = do
-    newGen <- getStdGen --newStdGen  
-    let (_, out) = foldr (\i (gen, str) -> let (gen1, pixel) = processPixel i j cam world gen in (gen1, pixel ++ str)) (newGen, "") [0..cam.imageWidth-1]
-    return out
+    --newGen <- getStdGen --initialize (singleton j)
+    foldr (\i str ->  processPixel i j cam world ++ str) "" [0..cam.imageWidth-1]
 
-processPixel :: Integer -> Integer -> Camera -> HittableList -> StdGen -> (StdGen, String)
-processPixel i j cam world gen =
-    let (gen3, color) = foldr (\n (gen1, c) -> let r = getRay cam i j in --gen1 in
-                                        (gen1, c .+ rayColor r world)) (gen, zeroesVec3) [1..cam.samplesPerPixel] in
-    (gen3, getColorStr color cam.colorSpace cam.samplesPerPixel)
+processPixel :: Integer -> Integer -> Camera -> HittableList -> String
+processPixel i j cam world =
+    let color = foldr (\n c -> let r = getRay cam i j in --gen1 in
+                                        c .+ rayColor r world) zeroesVec3 [1..cam.samplesPerPixel] in
+    getColorStr color cam.colorSpace cam.samplesPerPixel
 
 getRay :: Camera -> Integer -> Integer -> Ray -- StdGen -> (StdGen, Ray)
 getRay cam i j = --gen =

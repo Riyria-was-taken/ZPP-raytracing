@@ -141,3 +141,6 @@ degreesToRadians deg = deg * pi / 180.0
     
 linearToGamma :: Double -> Double
 linearToGamma lin = sqrt lin
+
+splitEvery :: Int -> [a] -> [[a]]
+splitEvery n = takeWhile (not . null) . map (take n) . iterate (drop n)
